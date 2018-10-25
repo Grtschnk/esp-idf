@@ -90,7 +90,7 @@ TAG_SERIAL_FLUSH = 2
 
 # regex matches an potential PC value (0x4xxxxxxx)
 MATCH_PCADDR = re.compile(r'0x4[0-9a-f]{7}', re.IGNORECASE)
-
+DEFAULT_TOOLCHAIN_BIN_LOCATION="D:/ESP32_Toolchain/toolchain/bin/"
 DEFAULT_TOOLCHAIN_PREFIX = "xtensa-esp32-elf-"
 
 DEFAULT_PRINT_FILTER = ""
@@ -556,7 +556,7 @@ class Monitor(object):
 
     def lookup_pc_address(self, pc_addr):
         translation = subprocess.check_output(
-            ["%saddr2line" % self.toolchain_prefix,
+            [DEFAULT_TOOLCHAIN_BIN_LOCATION+"%saddr2line" % self.toolchain_prefix,
              "-pfiaC", "-e", self.elf_file, pc_addr],
             cwd=".")
         if not b"?? ??:0" in translation:

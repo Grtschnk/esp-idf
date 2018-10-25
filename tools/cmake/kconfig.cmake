@@ -1,4 +1,6 @@
 include(ExternalProject)
+list(APPEND CMAKE_PROGRAM_PATH "${IDF_PATH}/../mconf-idf")
+list(APPEND CMAKE_PROGRAM_PATH "${IDF_PATH}/../toolchain/bin")
 
 macro(kconfig_set_variables)
     set(CONFIG_DIR ${CMAKE_BINARY_DIR}/config)
