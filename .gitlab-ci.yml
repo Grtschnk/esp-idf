@@ -121,12 +121,15 @@ build_template_app:
       - $BOT_LABEL_BUILD
       - $BOT_LABEL_REGULAR_TEST
   script:
-    - git clone https://github.com/espressif/esp-idf-template.git
+    # Set the variable for 'esp-idf-template' testing
+    - ESP_IDF_TEMPLATE_GIT=${ESP_IDF_TEMPLATE_GIT:-"https://github.com/espressif/esp-idf-template.git"}
+    - git clone ${ESP_IDF_TEMPLATE_GIT}
     - cd esp-idf-template
     # Try to use the same branch name for esp-idf-template that we're
     # using on esp-idf. If it doesn't exist then just stick to the default
     # branch
     - python $CHECKOUT_REF_SCRIPT esp-idf-template
+    - make defconfig
     # Test debug build (default)
     - make all V=1
     # Now test release build
@@ -1198,6 +1201,18 @@ UT_001_38:
     - ESP32_IDF
     - UT_T1_1
 
+UT_001_39:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+
+UT_001_40:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+
 UT_002_01:
   <<: *unit_test_template
   tags:
@@ -1324,7 +1339,7 @@ UT_004_13:
     - ESP32_IDF
     - UT_T1_1
     - psram
-    
+
 UT_005_01:
   <<: *unit_test_template
   tags:
@@ -1504,6 +1519,20 @@ UT_012_02:
     - 8Mpsram
 
 UT_012_03:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+    - 8Mpsram
+
+UT_012_04:
+  <<: *unit_test_template
+  tags:
+    - ESP32_IDF
+    - UT_T1_1
+    - 8Mpsram
+
+UT_012_05:
   <<: *unit_test_template
   tags:
     - ESP32_IDF

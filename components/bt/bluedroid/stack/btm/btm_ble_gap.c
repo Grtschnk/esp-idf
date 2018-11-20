@@ -708,6 +708,37 @@ extern void BTM_BleReadControllerFeatures(tBTM_BLE_CTRL_FEATURES_CBACK  *p_vsc_c
     return ;
 }
 
+void BTM_VendorHciEchoCmdCallback(tBTM_VSC_CMPL *p1)
+{
+    if (!p1) {
+        return;
+    }
+    uint8_t *p = p1->p_param_buf;
+    uint8_t status, echo;
+    STREAM_TO_UINT8  (status, p);
+    STREAM_TO_UINT8  (echo, p);
+    BTM_TRACE_DEBUG("%s status 0x%x echo 0x%x", __func__, status, echo);
+}
+
+/******************************************************************************
+**
+** Function         BTM_VendorHciEchoCmdTest
+**
+** Description      vendor common echo hci cmd test, controller will return status and echo
+**
+** Parameters:      echo : echo value
+**
+** Returns          void
+**
+*******************************************************************************/
+void BTM_VendorHciEchoCmdTest(uint8_t echo)
+{
+    BTM_VendorSpecificCommand (HCI_VENDOR_COMMON_ECHO_CMD_OPCODE,
+                                1,
+                                &echo, 
+                                BTM_VendorHciEchoCmdCallback);
+}
+
 /*******************************************************************************
 **
 ** Function         BTM_BleEnableMixedPrivacyMode
@@ -1526,7 +1557,7 @@ void BTM_BleSetScanFilterParams(tGATT_IF client_if, UINT32 scan_interval, UINT32
     if (BTM_BLE_ISVALID_PARAM(scan_interval, BTM_BLE_SCAN_INT_MIN, max_scan_interval) &&
             BTM_BLE_ISVALID_PARAM(scan_window, BTM_BLE_SCAN_WIN_MIN, max_scan_window) &&
             (scan_mode == BTM_BLE_SCAN_MODE_ACTI || scan_mode == BTM_BLE_SCAN_MODE_PASS) &&
-            (scan_duplicate_filter < BTM_BLE_SCAN_DUPLICATE_MAX)) {
+            (scan_duplicate_filter < BTM_BLE_SCAN_DUPLICATE_MAX) && (scan_window <= scan_interval)) {
         p_cb->scan_type = scan_mode;
         p_cb->scan_interval = scan_interval;
         p_cb->scan_window = scan_window;
