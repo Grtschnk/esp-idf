@@ -30,12 +30,12 @@ import json
 
 import gen_kconfig_doc
 import kconfiglib
-import pprint
 
 __version__ = "0.1"
 
-if not "IDF_CMAKE" in os.environ:
+if "IDF_CMAKE" not in os.environ:
     os.environ["IDF_CMAKE"] = ""
+
 
 def main():
     parser = argparse.ArgumentParser(description='confgen.py v%s - Config Generation Tool' % __version__, prog=os.path.basename(sys.argv[0]))
@@ -46,9 +46,11 @@ def main():
                         default=None)
 
     parser.add_argument('--defaults',
-                        help='Optional project defaults file, used if --config file doesn\'t exist',
+                        help='Optional project defaults file, used if --config file doesn\'t exist. '
+                             'Multiple files can be specified using multiple --defaults arguments.',
                         nargs='?',
-                        default=None)
+                        default=[],
+                        action='append')
 
     parser.add_argument('--create-config-if-missing',
                         help='If set, a new config file will be saved if the old one is not found',
@@ -69,27 +71,29 @@ def main():
     args = parser.parse_args()
 
     for fmt, filename in args.output:
-        if not fmt in OUTPUT_FORMATS.keys():
+        if fmt not in OUTPUT_FORMATS.keys():
             print("Format '%s' not recognised. Known formats: %s" % (fmt, OUTPUT_FORMATS.keys()))
             sys.exit(1)
 
     try:
-       args.env = [ (name,value) for (name,value) in ( e.split("=",1) for e in args.env) ]
+        args.env = [(name,value) for (name,value) in (e.split("=",1) for e in args.env)]
     except ValueError:
-       print("--env arguments must each contain =. To unset an environment variable, use 'ENV='")
-       sys.exit(1)
+        print("--env arguments must each contain =. To unset an environment variable, use 'ENV='")
+        sys.exit(1)
 
     for name, value in args.env:
         os.environ[name] = value
 
     config = kconfiglib.Kconfig(args.kconfig)
 
-    if args.defaults is not None:
+    if len(args.defaults) > 0:
         # always load defaults first, so any items which are not defined in that config
         # will have the default defined in the defaults file
-        if not os.path.exists(args.defaults):
-            raise RuntimeError("Defaults file not found: %s" % args.defaults)
-        config.load_config(args.defaults)
+        for name in args.defaults:
+            print("Loading defaults file %s..." % name)
+            if not os.path.exists(name):
+                raise RuntimeError("Defaults file not found: %s" % name)
+            config.load_config(name, replace=False)
 
     if args.config is not None:
         if os.path.exists(args.config):
@@ -97,7 +101,7 @@ def main():
         elif args.create_config_if_missing:
             print("Creating config file %s..." % args.config)
             config.write_config(args.config)
-        elif args.default is None:
+        elif args.config is None:
             raise RuntimeError("Config file not found: %s" % args.config)
 
         for output_type, filename in args.output:
@@ -121,6 +125,7 @@ def write_config(config, filename):
 """
     config.write_config(filename, header=CONFIG_HEADING)
 
+
 def write_header(config, filename):
     CONFIG_HEADING = """/*
  * Automatically generated file. DO NOT EDIT.
@@ -129,6 +134,7 @@ def write_header(config, filename):
 #pragma once
 """
     config.write_autoconf(filename, header=CONFIG_HEADING)
+
 
 def write_cmake(config, filename):
     with open(filename, "w") as f:
@@ -140,6 +146,7 @@ def write_cmake(config, filename):
 # Espressif IoT Development Framework (ESP-IDF) Configuration cmake include file
 #
 """)
+
         def write_node(node):
             sym = node.item
             if not isinstance(sym, kconfiglib.Symbol):
@@ -155,8 +162,10 @@ def write_cmake(config, filename):
                     prefix, sym.name, val))
         config.walk_menu(write_node)
 
+
 def get_json_values(config):
     config_dict = {}
+
     def write_node(node):
         sym = node.item
         if not isinstance(sym, kconfiglib.Symbol):
@@ -164,7 +173,7 @@ def get_json_values(config):
 
         val = sym.str_value  # this calculates _write_to_conf, due to kconfiglib magic
         if sym._write_to_conf:
-            if sym.type in [ kconfiglib.BOOL, kconfiglib.TRISTATE ]:
+            if sym.type in [kconfiglib.BOOL, kconfiglib.TRISTATE]:
                 val = (val != "n")
             elif sym.type == kconfiglib.HEX:
                 val = int(val, 16)
@@ -174,10 +183,12 @@ def get_json_values(config):
     config.walk_menu(write_node)
     return config_dict
 
+
 def write_json(config, filename):
     config_dict = get_json_values(config)
     with open(filename, "w") as f:
         json.dump(config_dict, f, indent=4, sort_keys=True)
+
 
 def write_json_menus(config, filename):
     result = []  # root level items
@@ -187,7 +198,7 @@ def write_json_menus(config, filename):
         try:
             json_parent = node_lookup[node.parent]["children"]
         except KeyError:
-            assert not node.parent in node_lookup  # if fails, we have a parent node with no "children" entity (ie a bug)
+            assert node.parent not in node_lookup  # if fails, we have a parent node with no "children" entity (ie a bug)
             json_parent = result  # root level node
 
         # node.kconfig.y means node has no dependency,
@@ -203,11 +214,11 @@ def write_json_menus(config, filename):
 
         new_json = None
         if node.item == kconfiglib.MENU or is_menuconfig:
-            new_json = { "type" : "menu",
-                         "title" : node.prompt[0],
-                         "depends_on": depends,
-                         "children": []
-            }
+            new_json = {"type": "menu",
+                        "title": node.prompt[0],
+                        "depends_on": depends,
+                        "children": []
+                        }
             if is_menuconfig:
                 sym = node.item
                 new_json["name"] = sym.name
@@ -233,12 +244,12 @@ def write_json_menus(config, filename):
                         greatest_range = [int(min_range.str_value), int(max_range.str_value)]
 
             new_json = {
-                "type" : kconfiglib.TYPE_TO_STR[sym.type],
-                "name" : sym.name,
+                "type": kconfiglib.TYPE_TO_STR[sym.type],
+                "name": sym.name,
                 "title": node.prompt[0] if node.prompt else None,
-                "depends_on" : depends,
+                "depends_on": depends,
                 "help": node.help,
-                "range" : greatest_range,
+                "range": greatest_range,
                 "children": [],
             }
         elif isinstance(node.item, kconfiglib.Choice):
@@ -247,7 +258,7 @@ def write_json_menus(config, filename):
                 "type": "choice",
                 "title": node.prompt[0],
                 "name": choice.name,
-                "depends_on" : depends,
+                "depends_on": depends,
                 "help": node.help,
                 "children": []
             }
@@ -259,6 +270,7 @@ def write_json_menus(config, filename):
     config.walk_menu(write_node)
     with open(filename, "w") as f:
         f.write(json.dumps(result, sort_keys=True, indent=4))
+
 
 def update_if_changed(source, destination):
     with open(source, "r") as f:
@@ -273,20 +285,21 @@ def update_if_changed(source, destination):
         f.write(source_contents)
 
 
-OUTPUT_FORMATS = {
-    "config" : write_config,
-    "header" : write_header,
-    "cmake" : write_cmake,
-    "docs" : gen_kconfig_doc.write_docs,
-    "json" : write_json,
-    "json_menus" : write_json_menus,
-    }
+OUTPUT_FORMATS = {"config": write_config,
+                  "header": write_header,
+                  "cmake": write_cmake,
+                  "docs": gen_kconfig_doc.write_docs,
+                  "json": write_json,
+                  "json_menus": write_json_menus,
+                  }
+
 
 class FatalError(RuntimeError):
     """
     Class for runtime errors (not caused by bugs but by user input).
     """
     pass
+
 
 if __name__ == '__main__':
     try:

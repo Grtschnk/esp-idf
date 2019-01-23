@@ -1,4 +1,3 @@
-import sys
 import glob
 import tempfile
 import os
@@ -6,7 +5,6 @@ import os.path
 import re
 import shutil
 import argparse
-import json
 import copy
 
 PROJECT_NAME = "unit-test-app"
@@ -16,11 +14,12 @@ PROJECT_PATH = os.getcwd()
 # Each file in configs/ directory defines a configuration. The format is the
 # same as sdkconfig file. Configuration is applied on top of sdkconfig.defaults
 # file from the project directory
-CONFIG_NAMES =  os.listdir(os.path.join(PROJECT_PATH, "configs"))
+CONFIG_NAMES = os.listdir(os.path.join(PROJECT_PATH, "configs"))
 
 # Build (intermediate) and output (artifact) directories
 BUILDS_DIR = os.path.join(PROJECT_PATH, "builds")
 BINARIES_DIR = os.path.join(PROJECT_PATH, "output")
+
 
 # Convert the values passed to the -T parameter to corresponding cache entry definitions
 # TESTS_ALL and TEST_COMPONENTS
@@ -46,9 +45,10 @@ class TestComponentAction(argparse.Action):
 
         # Brute force add reconfigure at the very beginning
         existing_actions = getattr(namespace, "actions", [])
-        if not "reconfigure" in existing_actions:
+        if "reconfigure" not in existing_actions:
             existing_actions = ["reconfigure"] + existing_actions
         setattr(namespace, "actions", existing_actions)
+
 
 class TestExcludeComponentAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -66,9 +66,10 @@ class TestExcludeComponentAction(argparse.Action):
 
         # Brute force add reconfigure at the very beginning
         existing_actions = getattr(namespace, "actions", [])
-        if not "reconfigure" in existing_actions:
+        if "reconfigure" not in existing_actions:
             existing_actions = ["reconfigure"] + existing_actions
         setattr(namespace, "actions", existing_actions)
+
 
 def add_argument_extensions(parser):
     # For convenience, define a -T argument that gets converted to -D arguments
@@ -76,15 +77,16 @@ def add_argument_extensions(parser):
     # For convenience, define a -T argument that gets converted to -D arguments
     parser.add_argument('-E', '--test-exclude-components', help="Specify the components to exclude from testing", nargs='+', action=TestExcludeComponentAction)
 
+
 def add_action_extensions(base_functions, base_actions):
 
     def ut_apply_config(ut_apply_config_name, args):
         config_name = re.match(r"ut-apply-config-(.*)", ut_apply_config_name).group(1)
 
-        def set_config_build_variables(prop, defval = None):
-            property_value = re.match(r"^%s=(.*)" % prop, config_file_content)
+        def set_config_build_variables(prop, defval=None):
+            property_value = re.findall(r"^%s=(.+)" % prop, config_file_content, re.MULTILINE)
             if (property_value):
-                property_value = property_value.group(1)
+                property_value = property_value[0]
             else:
                 property_value = defval
 
@@ -141,12 +143,12 @@ def add_action_extensions(base_functions, base_actions):
                 # config folder to build config
                 sdkconfig_default = os.path.join(PROJECT_PATH, "sdkconfig.defaults")
 
-                with open(sdkconfig_default, "r") as sdkconfig_default_file:
+                with open(sdkconfig_default, "rb") as sdkconfig_default_file:
                     sdkconfig_temp.write(sdkconfig_default_file.read())
 
                 sdkconfig_config = os.path.join(PROJECT_PATH, "configs", config_name)
-                with open(sdkconfig_config, "r") as sdkconfig_config_file:
-                    sdkconfig_temp.write("\n")
+                with open(sdkconfig_config, "rb") as sdkconfig_config_file:
+                    sdkconfig_temp.write(b"\n")
                     sdkconfig_temp.write(sdkconfig_config_file.read())
 
                 sdkconfig_temp.flush()
@@ -167,7 +169,7 @@ def add_action_extensions(base_functions, base_actions):
     # For local builds, use 'apply-config-NAME' target and then use normal 'all'
     # and 'flash' targets.
     def ut_build(ut_build_name, args):
-        # Create a copy of the passed arguments to prevent arg modifications to accrue if 
+        # Create a copy of the passed arguments to prevent arg modifications to accrue if
         # all configs are being built
         build_args = copy.copy(args)
 
